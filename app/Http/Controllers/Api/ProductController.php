@@ -324,4 +324,68 @@ class ProductController extends Controller
         }
     }
 
+    /**
+     * @OA\Post(
+     *     path="/api/products/{id}/prices",
+     *     operationId="createProductPrice",
+     *     tags={"Products"},
+     *     summary="Crear un nuevo precio para un producto",
+     *     description="Este endpoint permite agregar un nuevo precio para un producto en una divisa específica.",
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID del producto",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"currency_id", "price"},
+     *             @OA\Property(property="currency_id", type="integer", example=2),
+     *             @OA\Property(property="price", type="number", format="float", example=120.00)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Precio creado con éxito",
+     *         @OA\JsonContent(ref="#/components/schemas/ProductPrice")
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Producto no encontrado",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Producto no encontrado")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="Solicitud inválida"
+     *     )
+     * )
+     */
+    public function createPrice(Request $request, Product $product): JsonResponse
+    {
+        $validated = $request->validate([
+            'currency_id' => 'required|exists:currencies,id',
+            'price' => 'required|numeric|min:0',
+        ]);
+
+        $existingPrice = ProductPrice::where('product_id', $product->id)
+                                    ->where('currency_id', $validated['currency_id'])
+                                    ->first();
+
+        if ($existingPrice) {
+            return response()->json(['message' => 'El producto ya tiene un precio en esta divisa.'], 400);
+        }
+
+        $price = ProductPrice::create([
+            'product_id' => $product->id,
+            'currency_id' => $validated['currency_id'],
+            'price' => $validated['price'],
+        ]);
+
+        return response()->json($price, 201);
+    }
+
 }

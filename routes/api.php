@@ -10,3 +10,4 @@ Route::get('products/{product}', [ProductController::class, 'show']);
 Route::put('products/{product}', [ProductController::class, 'update']);
 Route::delete('products/{product}', [ProductController::class, 'destroy']);
 Route::get('products/{product}/prices', [ProductController::class, 'getPrices']);
+Route::post('products/{product}/prices', [ProductController::class, 'createPrice']);
