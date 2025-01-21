@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -226,7 +227,7 @@ class ProductController extends Controller
             ProductPrice::where('product_id', $product->id)
                         ->whereNotIn('currency_id', $existingCurrencyIds)
                         ->delete();
-                        
+
         } catch (ValidationException $e) {
             return response()->json([
                 'message' => 'Validation failed',
@@ -235,6 +236,92 @@ class ProductController extends Controller
         }
 
         return response()->json($product->load('prices'), 200);
+    }
+
+    /**
+     * @OA\Delete(
+     *     path="/api/products/{id}",
+     *     operationId="deleteProduct",
+     *     tags={"Products"},
+     *     summary="Eliminar un producto",
+     *     description="Este endpoint permite eliminar un producto y sus precios asociados.",
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID del producto",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Producto eliminado con éxito",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Producto eliminado exitosamente")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Producto no encontrado"
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="Solicitud inválida"
+     *     )
+     * )
+     */
+    public function destroy(Product $product): JsonResponse
+    {
+        try {
+            $product->prices()->delete();
+            $product->delete();
+            
+            return response()->json(['message' => 'Producto eliminado exitosamente'], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Producto no encontrado'], 404);
+        }
+
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/products/{id}/prices",
+     *     operationId="getProductPrices",
+     *     tags={"Products"},
+     *     summary="Obtener lista de precios de un producto",
+     *     description="Este endpoint devuelve la lista de precios asociados a un producto en diferentes divisas.",
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID del producto",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Lista de precios obtenida con éxito",
+     *         @OA\JsonContent(
+     *             type="array",
+     *             @OA\Items(ref="#/components/schemas/ProductPrice")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Producto no encontrado",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Producto no encontrado")
+     *         )
+     *     )
+     * )
+     */
+    public function getPrices(Product $product): JsonResponse
+    {
+        try {
+            $prices = $product->prices;
+
+            return response()->json($prices, 200);
+        } catch (ModelNotFoundException $th) {
+            return response()->json(['message' => 'Producto no encontrado'], 404);
+        }
     }
 
 }
