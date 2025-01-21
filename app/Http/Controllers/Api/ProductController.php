@@ -117,6 +117,124 @@ class ProductController extends Controller
             ], 422);
         }
 
-        return response()->json($product, 201);
+        return response()->json($product->load('prices'), 201);
     }
+
+    /**
+     * @OA\Schema(
+     *     schema="Product",
+     *     type="object",
+     *     required={"id", "name", "description", "price", "currency_id"},
+     *     @OA\Property(property="id", type="integer", example=1),
+     *     @OA\Property(property="name", type="string", example="Producto A"),
+     *     @OA\Property(property="description", type="string", example="Descripción del Producto A"),
+     *     @OA\Property(property="price", type="number", format="float", example=100.00),
+     *     @OA\Property(property="currency_id", type="integer", example=1),
+     *     @OA\Property(property="tax_cost", type="number", format="float", example=20.00),
+     *     @OA\Property(property="manufacturing_cost", type="number", format="float", example=50.00),
+     * )
+     */
+    public function show(Product $product): JsonResponse
+    {
+        return response()->json($product, 200);
+    }
+
+    /**
+     * @OA\Put(
+     *     path="/api/products/{id}",
+     *     operationId="updateProduct",
+     *     tags={"Products"},
+     *     summary="Actualizar un producto y sus precios",
+     *     description="Este endpoint permite actualizar los detalles de un producto, incluyendo los precios en diferentes divisas. Los precios existentes se sincronizan, permitiendo la eliminación de precios de divisas no incluidas.",
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID del producto",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"name", "price", "currency_id", "prices"},
+     *             @OA\Property(property="name", type="string", example="Producto A"),
+     *             @OA\Property(property="description", type="string", example="Descripción del Producto A"),
+     *             @OA\Property(property="price", type="number", format="float", example=100.00),
+     *             @OA\Property(property="currency_id", type="integer", example=1),
+     *             @OA\Property(property="tax_cost", type="number", format="float", example=20.00),
+     *             @OA\Property(property="manufacturing_cost", type="number", format="float", example=50.00),
+     *             @OA\Property(
+     *                 property="prices", type="array", 
+     *                 @OA\Items(
+     *                     @OA\Property(property="currency_id", type="integer", example=2),
+     *                     @OA\Property(property="price", type="number", format="float", example=120.00)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Producto actualizado con éxito",
+     *         @OA\JsonContent(ref="#/components/schemas/Product")
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Producto no encontrado"
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="Solicitud inválida"
+     *     )
+     * )
+     */
+    public function update(Request $request, Product $product): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'price' => 'required|numeric|min:0',
+                'currency_id' => 'required|exists:currencies,id',
+                'tax_cost' => 'nullable|numeric|min:0',
+                'manufacturing_cost' => 'nullable|numeric|min:0',
+                'prices' => 'required|array',
+                'prices.*.currency_id' => 'required|exists:currencies,id',
+                'prices.*.price' => 'required|numeric|min:0',
+            ]);
+
+            $product->update([
+                'name' => $validated['name'],
+                'description' => $validated['description'] ?? '',
+                'price' => $validated['price'],
+                'currency_id' => $validated['currency_id'],
+                'tax_cost' => $validated['tax_cost'] ?? 0,
+                'manufacturing_cost' => $validated['manufacturing_cost'] ?? 0,
+            ]);
+
+            $pricesData = collect($validated['prices'])->mapWithKeys(function ($priceData) {
+                return [$priceData['currency_id'] => ['price' => $priceData['price']]];
+            });
+            
+            foreach ($pricesData as $currencyId => $priceData) {
+                ProductPrice::updateOrCreate(
+                    ['product_id' => $product->id, 'currency_id' => $currencyId],
+                    $priceData
+                );
+            }
+
+            $existingCurrencyIds = collect($validated['prices'])->pluck('currency_id');
+            ProductPrice::where('product_id', $product->id)
+                        ->whereNotIn('currency_id', $existingCurrencyIds)
+                        ->delete();
+                        
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        }
+
+        return response()->json($product->load('prices'), 200);
+    }
+
 }
