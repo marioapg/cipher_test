@@ -10,6 +10,23 @@ use App\Models\ProductPrice;
 use Illuminate\Http\Request;
 use App\Models\Product;
 
+/**
+ * 
+ * @OA\Info(
+ *     title="API de Productos",
+ *     version="1.0.0",
+ *     description="API para la gestión de productos y precios en diferentes divisas. TEST CIPH3R",
+ *     @OA\Contact(
+ *         email="mperez.392@gmail.com"
+ *     ),
+ *     @OA\License(
+ *         name="MIT",
+ *         url="https://opensource.org/licenses/MIT"
+ *     )
+ * )
+ *
+ */
+
 class ProductController extends Controller
 {
     /**
@@ -122,17 +139,31 @@ class ProductController extends Controller
     }
 
     /**
-     * @OA\Schema(
-     *     schema="Product",
-     *     type="object",
-     *     required={"id", "name", "description", "price", "currency_id"},
-     *     @OA\Property(property="id", type="integer", example=1),
-     *     @OA\Property(property="name", type="string", example="Producto A"),
-     *     @OA\Property(property="description", type="string", example="Descripción del Producto A"),
-     *     @OA\Property(property="price", type="number", format="float", example=100.00),
-     *     @OA\Property(property="currency_id", type="integer", example=1),
-     *     @OA\Property(property="tax_cost", type="number", format="float", example=20.00),
-     *     @OA\Property(property="manufacturing_cost", type="number", format="float", example=50.00),
+     * @OA\Get(
+     *     path="/api/products/{id}",
+     *     operationId="getProductById",
+     *     tags={"Products"},
+     *     summary="Obtener un producto por ID",
+     *     description="Este endpoint permite obtener un producto específico usando su ID.",
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID del producto que se desea obtener",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Producto encontrado y retornado correctamente",
+     *         @OA\JsonContent(ref="#/components/schemas/Product")
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Producto no encontrado",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Producto no encontrado")
+     *         )
+     *     )
      * )
      */
     public function show(Product $product): JsonResponse
@@ -330,7 +361,7 @@ class ProductController extends Controller
      *     operationId="createProductPrice",
      *     tags={"Products"},
      *     summary="Crear un nuevo precio para un producto",
-     *     description="Este endpoint permite agregar un nuevo precio para un producto en una divisa específica.",
+     *     description="Este endpoint permite agregar un nuevo precio para un producto en una divisa específica. Si el producto ya tiene un precio en la misma divisa, se retorna un error.",
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -349,7 +380,20 @@ class ProductController extends Controller
      *     @OA\Response(
      *         response=201,
      *         description="Precio creado con éxito",
-     *         @OA\JsonContent(ref="#/components/schemas/ProductPrice")
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="id", type="integer", example=1),
+     *             @OA\Property(property="product_id", type="integer", example=123),
+     *             @OA\Property(property="currency_id", type="integer", example=2),
+     *             @OA\Property(property="price", type="number", format="float", example=120.00)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="Error de validación: El producto ya tiene un precio en esta divisa",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="El producto ya tiene un precio en esta divisa.")
+     *         )
      *     ),
      *     @OA\Response(
      *         response=404,
@@ -357,10 +401,6 @@ class ProductController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="message", type="string", example="Producto no encontrado")
      *         )
-     *     ),
-     *     @OA\Response(
-     *         response=400,
-     *         description="Solicitud inválida"
      *     )
      * )
      */
